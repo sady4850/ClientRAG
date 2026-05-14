@@ -1,8 +1,15 @@
 import { rankByCosine } from "../core/search";
-import type { SearchResult, VectorRecord } from "../types";
+import { summarizeDocuments } from "./summarize";
+import type {
+  DocumentSummary,
+  ExtractedDocument,
+  SearchResult,
+  VectorRecord,
+} from "../types";
 
 export class MemoryVectorStore {
   private records = new Map<string, VectorRecord>();
+  private sources = new Map<string, ExtractedDocument>();
 
   async upsert(records: VectorRecord[]) {
     for (const record of records) {
@@ -28,13 +35,34 @@ export class MemoryVectorStore {
         this.records.delete(record.id);
       }
     }
+    this.sources.delete(documentId);
   }
 
   async clearCollection(collectionId: string) {
+    const removed = new Set<string>();
     for (const record of this.records.values()) {
       if (record.collectionId === collectionId) {
+        removed.add(record.documentId);
         this.records.delete(record.id);
       }
     }
+    for (const documentId of removed) {
+      this.sources.delete(documentId);
+    }
+  }
+
+  async listDocuments(collectionId: string): Promise<DocumentSummary[]> {
+    const records = [...this.records.values()].filter(
+      (record) => record.collectionId === collectionId,
+    );
+    return summarizeDocuments(records);
+  }
+
+  async saveDocumentSource(document: ExtractedDocument) {
+    this.sources.set(document.id, document);
+  }
+
+  async getDocumentSource(documentId: string): Promise<ExtractedDocument | undefined> {
+    return this.sources.get(documentId);
   }
 }
