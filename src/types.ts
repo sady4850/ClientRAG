@@ -31,3 +31,10 @@ export type SearchResult = {
   chunk: TextChunk;
   score: number;
 };
+
+export type DocumentSummary = {
+  documentId: string;
+  documentName: string;
+  chunkCount: number;
+  pageCount: number;
+};
