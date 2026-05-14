@@ -20,7 +20,7 @@ type AppState =
   | "searching"
   | "error";
 
-type ModelProgress = { loaded: number; total: number };
+type ModelProgress = { loaded: number };
 
 function formatResult(result: SearchResult) {
   return `${result.chunk.documentName} — page ${result.chunk.pageNumber} (score ${result.score.toFixed(3)})\n\n${result.chunk.text}`;
@@ -107,6 +107,7 @@ export function App() {
   async function getRag() {
     const key = `${settings.model}|${settings.targetSize}|${settings.overlap}`;
     if (!ragRef.current || ragKeyRef.current !== key) {
+      ragRef.current?.terminate();
       const { ClientRAG } = await import("./core/clientrag");
       ragRef.current = new ClientRAG({
         storage: "indexeddb",
@@ -133,7 +134,7 @@ export function App() {
         break;
       case "loading-model":
         setState("loading-model");
-        setModelProgress({ loaded: event.loaded, total: event.total });
+        setModelProgress({ loaded: event.loaded });
         break;
       case "embedding":
         setState("indexing");
@@ -214,7 +215,7 @@ export function App() {
         onProgress: (event: RechunkProgress) => {
           switch (event.phase) {
             case "loading-model":
-              setModelProgress({ loaded: event.loaded, total: event.total });
+              setModelProgress({ loaded: event.loaded });
               break;
             case "document":
               setModelProgress(null);
@@ -451,7 +452,7 @@ export function App() {
                 ? ` · ${(modelProgress.loaded / (1024 * 1024)).toFixed(1)} MB`
                 : ""}
             </div>
-            <div className="progress-track progress-track--indeterminate" role="progressbar" aria-busy="true">
+            <div className="progress-track" role="progressbar" aria-busy="true">
               <div className="progress-fill progress-fill--indeterminate" />
             </div>
           </div>

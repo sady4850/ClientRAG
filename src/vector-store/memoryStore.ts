@@ -30,12 +30,16 @@ export class MemoryVectorStore {
   }
 
   async deleteDocument(collectionId: string, documentId: string) {
+    await this.deleteDocumentVectors(collectionId, documentId);
+    this.sources.delete(documentId);
+  }
+
+  async deleteDocumentVectors(collectionId: string, documentId: string) {
     for (const record of this.records.values()) {
       if (record.collectionId === collectionId && record.documentId === documentId) {
         this.records.delete(record.id);
       }
     }
-    this.sources.delete(documentId);
   }
 
   async clearCollection(collectionId: string) {

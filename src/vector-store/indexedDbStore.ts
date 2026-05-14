@@ -49,6 +49,20 @@ export class IndexedDbVectorStore {
     });
   }
 
+  async deleteDocumentVectors(collectionId: string, documentId: string) {
+    const db = await this.open();
+    const records = await this.getAllByCollection(collectionId);
+
+    await runTransaction(db, [VECTORS_STORE], "readwrite", (tx) => {
+      const vectors = tx.objectStore(VECTORS_STORE);
+      for (const record of records) {
+        if (record.documentId === documentId) {
+          vectors.delete(record.id);
+        }
+      }
+    });
+  }
+
   async listDocuments(collectionId: string): Promise<DocumentSummary[]> {
     const records = await this.getAllByCollection(collectionId);
     return summarizeDocuments(records);

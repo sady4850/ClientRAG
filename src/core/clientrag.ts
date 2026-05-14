@@ -19,6 +19,7 @@ export type VectorStore = {
     topK: number;
   }): Promise<SearchResult[]>;
   deleteDocument(collectionId: string, documentId: string): Promise<void>;
+  deleteDocumentVectors(collectionId: string, documentId: string): Promise<void>;
   clearCollection(collectionId: string): Promise<void>;
   listDocuments(collectionId: string): Promise<DocumentSummary[]>;
   saveDocumentSource(document: ExtractedDocument): Promise<void>;
@@ -34,13 +35,13 @@ export type ClientRagOptions = {
 
 export type IndexProgress =
   | { phase: "extracting"; documentName: string }
-  | { phase: "loading-model"; loaded: number; total: number }
+  | { phase: "loading-model"; loaded: number }
   | { phase: "embedding"; embedded: number; total: number }
   | { phase: "storing" }
   | { phase: "done"; chunks: number };
 
 export type RechunkProgress =
-  | { phase: "loading-model"; loaded: number; total: number }
+  | { phase: "loading-model"; loaded: number }
   | { phase: "document"; documentName: string; index: number; total: number }
   | { phase: "embedding"; embedded: number; total: number; documentName: string }
   | { phase: "done"; processed: number; skipped: number };
@@ -102,8 +103,8 @@ export class ClientRAG {
     }
 
     await this.embedder.load({
-      onProgress: aggregateModelProgress((loaded, total) => {
-        notify({ phase: "loading-model", loaded, total });
+      onProgress: aggregateModelProgress((loaded) => {
+        notify({ phase: "loading-model", loaded });
       }),
     });
 
@@ -153,8 +154,8 @@ export class ClientRAG {
     }
 
     await this.embedder.load({
-      onProgress: aggregateModelProgress((loaded, total) => {
-        notify({ phase: "loading-model", loaded, total });
+      onProgress: aggregateModelProgress((loaded) => {
+        notify({ phase: "loading-model", loaded });
       }),
     });
 
@@ -177,8 +178,7 @@ export class ClientRAG {
       });
 
       const chunks = chunkDocument(source, this.chunkOptions);
-      await this.store.deleteDocument(collectionId, summary.documentId);
-      await this.store.saveDocumentSource(source);
+      await this.store.deleteDocumentVectors(collectionId, summary.documentId);
 
       if (chunks.length === 0) {
         processed += 1;
@@ -251,12 +251,14 @@ export class ClientRAG {
   async deleteDocument(documentId: string, collectionId: string = DEFAULT_COLLECTION) {
     await this.store.deleteDocument(collectionId, documentId);
   }
+
+  terminate() {
+    this.embedder.terminate();
+  }
 }
 
-type FileState = { loaded: number; total: number };
-
-function aggregateModelProgress(emit: (loaded: number, total: number) => void) {
-  const files = new Map<string, FileState>();
+function aggregateModelProgress(emit: (loaded: number) => void) {
+  const perFile = new Map<string, number>();
   let maxLoaded = 0;
 
   return (event: unknown) => {
@@ -268,24 +270,18 @@ function aggregateModelProgress(emit: (loaded: number, total: number) => void) {
       total?: number;
     };
     const key = e?.file ?? e?.name;
-    if (!key || !e?.status) return;
+    if (!key || e?.status !== "progress" && e?.status !== "done") return;
 
     if (e.status === "progress") {
-      files.set(key, { loaded: e.loaded ?? 0, total: e.total ?? 0 });
-    } else if (e.status === "done") {
-      const prev = files.get(key);
-      if (prev && prev.total > 0) files.set(key, { loaded: prev.total, total: prev.total });
-    } else if (e.status === "initiate" || e.status === "download") {
-      if (!files.has(key)) files.set(key, { loaded: 0, total: 0 });
+      perFile.set(key, e.loaded ?? 0);
     } else {
-      return;
+      const total = e.total ?? perFile.get(key) ?? 0;
+      perFile.set(key, total);
     }
 
     let loaded = 0;
-    for (const state of files.values()) {
-      loaded += state.loaded;
-    }
+    for (const value of perFile.values()) loaded += value;
     if (loaded > maxLoaded) maxLoaded = loaded;
-    emit(maxLoaded, 0);
+    emit(maxLoaded);
   };
 }
