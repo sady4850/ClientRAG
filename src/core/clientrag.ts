@@ -102,16 +102,9 @@ export class ClientRAG {
     }
 
     await this.embedder.load({
-      onProgress: (event) => {
-        const e = event as { status?: string; loaded?: number; total?: number };
-        if (e?.status === "progress") {
-          notify({
-            phase: "loading-model",
-            loaded: e.loaded ?? 0,
-            total: e.total ?? 0,
-          });
-        }
-      },
+      onProgress: aggregateModelProgress((loaded, total) => {
+        notify({ phase: "loading-model", loaded, total });
+      }),
     });
 
     const total = chunks.length;
@@ -160,16 +153,9 @@ export class ClientRAG {
     }
 
     await this.embedder.load({
-      onProgress: (event) => {
-        const e = event as { status?: string; loaded?: number; total?: number };
-        if (e?.status === "progress") {
-          notify({
-            phase: "loading-model",
-            loaded: e.loaded ?? 0,
-            total: e.total ?? 0,
-          });
-        }
-      },
+      onProgress: aggregateModelProgress((loaded, total) => {
+        notify({ phase: "loading-model", loaded, total });
+      }),
     });
 
     let processed = 0;
@@ -265,4 +251,51 @@ export class ClientRAG {
   async deleteDocument(documentId: string, collectionId: string = DEFAULT_COLLECTION) {
     await this.store.deleteDocument(collectionId, documentId);
   }
+}
+
+type FileState = { loaded: number; total: number };
+
+function aggregateModelProgress(emit: (loaded: number, total: number) => void) {
+  const files = new Map<string, FileState>();
+  let lastFraction = 0;
+
+  return (event: unknown) => {
+    const e = event as {
+      status?: string;
+      file?: string;
+      name?: string;
+      loaded?: number;
+      total?: number;
+    };
+    const key = e?.file ?? e?.name;
+    if (!key || !e?.status) return;
+
+    if (e.status === "progress") {
+      files.set(key, { loaded: e.loaded ?? 0, total: e.total ?? 0 });
+    } else if (e.status === "done") {
+      const prev = files.get(key);
+      if (prev && prev.total > 0) files.set(key, { loaded: prev.total, total: prev.total });
+    } else if (e.status === "initiate" || e.status === "download") {
+      if (!files.has(key)) files.set(key, { loaded: 0, total: 0 });
+    } else {
+      return;
+    }
+
+    let loaded = 0;
+    let total = 0;
+    for (const state of files.values()) {
+      loaded += state.loaded;
+      total += state.total;
+    }
+    if (total <= 0) return;
+
+    const fraction = loaded / total;
+    if (fraction < lastFraction) {
+      loaded = Math.round(lastFraction * total);
+    } else {
+      lastFraction = fraction;
+    }
+
+    emit(loaded, total);
+  };
 }
