@@ -183,6 +183,21 @@ h2 {
   transition: width 120ms ease-out;
 }
 
+.progress-fill--indeterminate {
+  width: 40%;
+  animation: progress-indeterminate 1.2s ease-in-out infinite;
+  transition: none;
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
 .notice.subtle {
   background: #f6f7f9;
   border: 1px solid #e5eaef;

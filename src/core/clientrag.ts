@@ -257,7 +257,7 @@ type FileState = { loaded: number; total: number };
 
 function aggregateModelProgress(emit: (loaded: number, total: number) => void) {
   const files = new Map<string, FileState>();
-  let lastFraction = 0;
+  let maxLoaded = 0;
 
   return (event: unknown) => {
     const e = event as {
@@ -282,20 +282,10 @@ function aggregateModelProgress(emit: (loaded: number, total: number) => void) {
     }
 
     let loaded = 0;
-    let total = 0;
     for (const state of files.values()) {
       loaded += state.loaded;
-      total += state.total;
     }
-    if (total <= 0) return;
-
-    const fraction = loaded / total;
-    if (fraction < lastFraction) {
-      loaded = Math.round(lastFraction * total);
-    } else {
-      lastFraction = fraction;
-    }
-
-    emit(loaded, total);
+    if (loaded > maxLoaded) maxLoaded = loaded;
+    emit(maxLoaded, 0);
   };
 }

@@ -447,13 +447,13 @@ export function App() {
           <div className="notice">
             <div className="progress-label">
               Loading embedding model
-              {modelProgress && modelProgress.total > 0
-                ? ` · ${Math.round((modelProgress.loaded / modelProgress.total) * 100)}%`
+              {modelProgress && modelProgress.loaded > 0
+                ? ` · ${(modelProgress.loaded / (1024 * 1024)).toFixed(1)} MB`
                 : ""}
             </div>
-            {modelProgress && modelProgress.total > 0 && (
-              <ProgressBar fraction={modelProgress.loaded / modelProgress.total} />
-            )}
+            <div className="progress-track progress-track--indeterminate" role="progressbar" aria-busy="true">
+              <div className="progress-fill progress-fill--indeterminate" />
+            </div>
           </div>
         )}
         {state === "indexing" && (
