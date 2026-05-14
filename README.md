@@ -2,7 +2,11 @@
 
 Private, browser-only semantic search for PDFs.
 
+**[Live demo →](https://sady4850.github.io/ClientRAG/)**
+
 ClientRAG runs PDF text extraction, embedding, and vector search entirely in the browser. Your documents never leave the page — there is no backend and no upload.
+
+> **About the name.** ClientRAG covers the **retrieval** side of RAG: chunking, embeddings, semantic search over your own documents. There is no generation/LLM step in the app today, and adding one is **not on the immediate roadmap** — see [Generation](#generation-not-included) below. The plumbing (`SearchResult[]`) is shaped so a generator adapter can be layered on later without touching the core.
 
 ## Privacy model
 
@@ -12,7 +16,15 @@ ClientRAG runs PDF text extraction, embedding, and vector search entirely in the
 - The only network traffic is the **first-time download** of the embedding model and ONNX Runtime wasm assets from a CDN (or your hosted copy). After that, the browser caches them.
 - There is no analytics, telemetry, or document upload of any kind.
 
-Generation (RAG answers via an LLM) is intentionally **out of scope for the MVP**. If/when it lands, it will be opt-in, will require your own API key, and will only send the retrieved snippets — never the whole document.
+## Generation (not included)
+
+The "G" in RAG — sending retrieved chunks to an LLM to synthesize an answer — is deliberately absent. The reason is the trade-off for a public demo:
+
+- A hosted LLM (OpenAI/Anthropic/etc.) needs an API key. Putting a key field in a public web app means each visitor has to paste their own key into the browser, which is a poor UX and a real security risk (XSS, malicious extensions, copy-pasted into the wrong tab).
+- A local browser LLM (WebLLM/WebGPU) means another 1-4 GB download and uneven hardware support.
+- A self-hosted endpoint defeats the "no backend" property of this project.
+
+If you want generation on top, the public API (`rag.search({ query, topK })` returns `SearchResult[]` with `chunk.text`, page, score) is designed to plug into any generator: just feed the snippets to your own LLM call. The repo does not provide that adapter.
 
 ## What it does today
 
@@ -75,13 +87,14 @@ Results contain `{ chunk: { documentName, pageNumber, text, ... }, score }`.
 - Code-splitting and progress UX for first-use model download (done).
 - Persistence controls — restore on refresh, delete/clear (done).
 - GitHub Pages workflow (done).
-- Optional generator adapter (OpenAI-compatible). Opt-in, bring-your-own-key, retrieved snippets only.
+- Optional: multi-file drop, score threshold, snippet expand, snapshot/export of the indexed collection.
+- Optional: table-aware extraction, mojibake replacement table, OCR fallback for image-only PDFs.
 
 ## Non-goals
 
 - No backend.
 - No account system or multi-user sync.
-- No mandatory cloud LLM.
+- No bundled LLM / generation step (see [Generation](#generation-not-included)).
 - No committed API keys or large model binaries.
 
 [Transformers.js]: https://github.com/huggingface/transformers.js
